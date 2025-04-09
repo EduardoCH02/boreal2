@@ -1,0 +1,180 @@
+USE [ASYS_DEV]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [PDC].[SP_ACTUALIZA_ESTADO_CONTRATO]  	
+	@FL_VALOR_RETORNO int=0 out,	
+	@P_ID_CONTRATO INT,		
+	@P_ID_ORGANISMO INT,	
+	@P_CL_ESTADO_NUEVO NVARCHAR(30),
+	@P_CL_ESTADO_ANTERIOR NVARCHAR(30),		
+	@P_DS_OBSERVACIONES NVARCHAR(MAX),
+	@P_NB_USUARIO NVARCHAR(50),
+	@P_NB_PROGRAMA NVARCHAR(50)	
+AS
+DECLARE 
+	@PAGADO INT,
+	@BANDERA BIT = 'TRUE',
+	@FG_RESTRICCION NVARCHAR(5),
+	@V_FG_UBICACION INT
+   	
+BEGIN
+
+BEGIN TRY
+
+	DECLARE @P_XML XML = (SELECT TOP 1 XML_CONFIGURACION FROM ADM.S_CONFIGURACION WHERE CL_CONFIGURACION = 'ROLES_PERMISOS_PDC_CONSULTA')
+
+	SET @FL_VALOR_RETORNO = 0
+			BEGIN TRAN	
+			
+
+				IF(@P_CL_ESTADO_ANTERIOR = 'PENDIENTE' and @P_CL_ESTADO_NUEVO = 'VIGENTE')
+					BEGIN		
+					
+						DECLARE @CXC_PENDIENTES TABLE(
+							ID_CONTRATO INT,
+							ID_CXC INT,
+							NO_CXC NVARCHAR(50),
+							CL_ESTADO NVARCHAR(10)
+						)
+
+						INSERT INTO @CXC_PENDIENTES(
+							ID_CONTRATO,
+							ID_CXC,
+							NO_CXC,
+							CL_ESTADO
+						)
+						SELECT 
+							MC.ID_CONTRATO,
+							CXC.ID_CXC,
+							CXC.NO_CXC,
+							CXC.CL_ESTADO_CXC
+						FROM PDC.M_CONTRATO MC 
+						JOIN DXC.K_CXC CXC	
+							ON MC.ID_CONTRATO = CXC.ID_CONTRATO
+						WHERE MC.id_contrato = @P_ID_CONTRATO
+							AND CXC.CL_TIPO_CXC='CONTRATOS'
+
+                         SELECT @PAGADO=COUNT(1)
+                           FROM @CXC_PENDIENTES WHERE CL_ESTADO = 'PRO'
+
+							
+						SET @FG_RESTRICCION = isnull((Select NO_CONFIGURACION FROM ADM.S_CONFIGURACION 
+											   WHERE CL_CONFIGURACION = 'CL_RESTRICCION_CXC'),'NO')
+																	
+						 IF @FG_RESTRICCION = 'SI' AND @PAGADO > 0
+								SET @BANDERA = 'FALSE'	
+														
+					END
+
+					SET @V_FG_UBICACION  = ISNULL((SELECT TOP 1 1
+												FROM PDC.M_CONTRATO MC
+												JOIN PDC.M_TOMA MT ON MC.ID_CONTRATO = MT.ID_CONTRATO
+												WHERE MC.ID_CONTRATO = @P_ID_CONTRATO 
+													AND MC.CL_RUTA IS NOT NULL
+													AND MC.CL_ZONA IS NOT NULL
+													AND MC.CL_CARPETA IS NOT NULL
+													AND MT.CL_ZONA IS NOT NULL
+													AND MT.CL_RUTA IS NOT NULL),0)
+
+					IF EXISTS(
+							SELECT 
+								R.CL_ROL 
+							FROM ADM.C_USUARIO U
+							INNER JOIN ADM.C_ROL R
+								ON R.ID_ROL = U.ID_ROL
+							INNER JOIN  @P_XML.nodes('roles/ROL') AS T(Item)
+								ON T.Item.value('(@CL_ROL)','NVARCHAR(100)') = R.CL_ROL
+							WHERE U.CL_USUARIO = @P_NB_USUARIO
+							AND ISNULL(T.Item.value('(@FG_CAMBIO_ESTADO)','INT'),0) = 1
+							)
+					BEGIN
+						IF @BANDERA = 'TRUE'
+							BEGIN
+							DECLARE @CL_CUENTA NVARCHAR(20) = (SELECT CL_CUENTA FROM PDC.M_CONTRATO WHERE ID_CONTRATO = @P_ID_CONTRATO)
+							IF ((@P_CL_ESTADO_NUEVO = 'VIGENTE' AND @CL_CUENTA IS NOT NULL AND @CL_CUENTA != '') OR (@P_CL_ESTADO_NUEVO != 'VIGENTE'))
+							BEGIN
+								IF ISNULL(@P_CL_ESTADO_NUEVO, '') <> ''
+								BEGIN
+								IF @V_FG_UBICACION = 1
+								BEGIN
+
+									UPDATE PDC.M_CONTRATO 
+									   SET CL_ESTADO_CONTRATO = @P_CL_ESTADO_NUEVO
+						 			 WHERE ID_CONTRATO = @P_ID_CONTRATO
+
+												 INSERT INTO PDC.K_ESTADO_CONTRATO (ID_ORGANISMO, 
+																	ID_CONTRATO, 
+																	CL_ESTADO_ANTERIOR, 
+																	CL_ESTADO_NUEVO,
+																	FE_CAMBIO,
+																	DS_OBSERVACIONES,
+																	FE_CREACION,
+																	CL_USUARIO_APP_CREA,
+																	NB_PROGRAMA_CREA)
+															 VALUES(@P_ID_ORGANISMO,
+																	@p_ID_CONTRATO,
+																	SUBSTRING (@P_CL_ESTADO_ANTERIOR,0,4),
+																	SUBSTRING (@P_CL_ESTADO_NUEVO,0,4),
+																	GETDATE(),
+																	@P_DS_OBSERVACIONES,
+																	GETDATE(),
+																	@P_NB_USUARIO,
+																	@P_NB_PROGRAMA)
+															
+									DECLARE @FG_BITACORA_INSERTADA INT
+									DECLARE @DS_BITACORA NVARCHAR(250)
+
+									SET @DS_BITACORA = CONCAT('Se cambió el estado del contrato de ', (SELECT NB_ESTADO_CONTRATO FROM VW_ESTADO_CONTRATO WHERE CL_ESTADO_CONTRATO = @P_CL_ESTADO_ANTERIOR), ' a ', (SELECT NB_ESTADO_CONTRATO FROM VW_ESTADO_CONTRATO WHERE CL_ESTADO_CONTRATO = @P_CL_ESTADO_NUEVO), '.' )
+
+									EXEC ADM.SP_INSERTA_BITACORA_OPERACIONES @PIN_ID_CONTRATO = @P_ID_CONTRATO,
+																			 @PIN_CL_CUENTA = NULL,
+																			 @PIN_CL_BITACORA = 'PADRÓN CLIENTES',
+																			 @PIN_DS_BITACORA = @DS_BITACORA,
+																			 @PIN_XML_DATOS_ADICIONALES = NULL,
+																			 @PIN_CL_USUARIO_BITACORA = @P_NB_USUARIO,
+																			 @PIN_CL_USUARIO = @P_NB_USUARIO,
+																			 @PIN_NB_PROGRAMA = @P_NB_PROGRAMA,
+																			 @POUT_FG_RETORNO = @FG_BITACORA_INSERTADA OUT
+										IF @FL_VALOR_RETORNO = 0
+										BEGIN
+											SET @FL_VALOR_RETORNO = 1
+										END
+
+								END
+								ELSE
+								BEGIN
+									SET @FL_VALOR_RETORNO = -2 -- No tiene ruta, carpeta o zona				
+								END
+								END
+								ELSE
+								BEGIN
+									SET @FL_VALOR_RETORNO = -6 -- NUEVO ESTADO VACIO
+								END
+							END
+							ELSE
+							BEGIN
+								SET @FL_VALOR_RETORNO = -4 -- NO TIENE CL_CUENTA
+							END
+							END
+						ELSE
+						   BEGIN
+							  SET @FL_VALOR_RETORNO = -3
+						   END;	
+					END
+					ELSE
+					BEGIN
+						SET @FL_VALOR_RETORNO = -5 -- ERROR MIENTRAS SE AGREGA MENSAJE PERSONALIZADO
+					END
+					COMMIT
+														           					
+				END TRY
+				
+			BEGIN CATCH
+				IF @@TRANCOUNT > 0
+					ROLLBACK
+					EXEC SP_ENVIA_ERROR
+			END CATCH	
+END
