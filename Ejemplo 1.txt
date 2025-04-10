@@ -1,0 +1,294 @@
+<%@ Page Title="Convenios por incorporación" Language="C#" MasterPageFile="~/Menu.master" AutoEventWireup="true" CodeBehind="ConveniosIncorporacion.aspx.cs" Inherits="SC.WebApp.DocumentosPorCobrar.ConveniosIncorporacion" %>
+
+<asp:Content ID="Content1" ContentPlaceHolderID="head" runat="server">
+</asp:Content>
+<asp:Content ID="Content2" ContentPlaceHolderID="mainContentPlaceHolder" runat="server">
+    <telerik:RadCodeBlock ID="RadCodeBlock1" runat="server">
+        <script type="text/javascript">
+            //function RowDblClick(sender, eventArgs) {
+            //    sender.get_masterTableView().editItem(eventArgs.get_itemIndexHierarchical());
+            //}
+
+            function StandardConfirm(sender, args) {
+                args.set_cancel(!window.confirm("¿Deseas eliminar este convenio?"));
+            }
+
+            function AbrirPagos() {
+                var selectedItem = $find("<%=rgConvenios.ClientID %>").get_masterTableView().get_selectedItems()[0];
+                if (selectedItem != null) {
+                    windowProperties = {
+                        width: 600,
+                        height: 500
+                    }
+                    var vUrl = "VentanaPagosComentarios.aspx?idCxC=" + selectedItem.getDataKeyValue("ID_CXC");
+                    openChildDialog(vUrl, "rwPagos", "Comentarios a pagos", windowProperties);
+                }
+                else
+                    radalert("Seleccione un convenio.", 300, 100)
+            }
+
+            function OnCloseWindow(oWnd, args) {
+                $find("<%=rgConvenios.ClientID%>").get_masterTableView().rebind();
+            }
+
+            function ValidarBotones(sender, args) {
+                var dataItem = args.get_item();
+                var vClEstadoCxC = dataItem.getDataKeyValue("CL_ESTADO_CXC");
+
+                var ctrlBtnEditar = $find("<%= btnEditar.ClientID %>");
+                var ctrlBtnEliminar = $find("<%= btnEliminar.ClientID %>");
+                var ctrlBtnConsultar = $find("<%= btnConsultar.ClientID %>");
+
+                if ((ctrlBtnEditar != null) && (ctrlBtnEliminar != null) && (ctrlBtnConsultar != null)) {
+                    switch (vClEstadoCxC) {
+                        case "PRO":
+                            ctrlBtnEditar.set_enabled(true);
+                            ctrlBtnEliminar.set_enabled(true);
+                            ctrlBtnConsultar.set_enabled(true);
+                            break;
+
+                        case "VIG":
+                            ctrlBtnEditar.set_enabled(false);
+                            ctrlBtnEliminar.set_enabled(true);
+                            ctrlBtnConsultar.set_enabled(true);
+                            break;
+
+                        case "PAG":
+                            ctrlBtnEditar.set_enabled(false);
+                            ctrlBtnEliminar.set_enabled(false);
+                            ctrlBtnConsultar.set_enabled(true);
+                            break;
+
+                        case "CAN":
+                            ctrlBtnEditar.set_enabled(false);
+                            ctrlBtnEliminar.set_enabled(false);
+                            ctrlBtnConsultar.set_enabled(true);
+                            break;
+                    }
+                }
+            }
+
+            function DesactivarBotones() {
+                var ctrlBtnEditar = $find("<%= btnEditar.ClientID %>");
+                var ctrlBtnEliminar = $find("<%= btnEliminar.ClientID %>");
+                var ctrlBtnConsultar = $find("<%= btnConsultar.ClientID %>");
+
+                if ((ctrlBtnEditar != null) && (ctrlBtnEliminar != null) && (ctrlBtnConsultar != null)) {
+                    ctrlBtnEditar.set_enabled(false);
+                    ctrlBtnEliminar.set_enabled(false);
+                    ctrlBtnConsultar.set_enabled(false);
+                }
+            }
+            function AbrirReportePopUp() {
+                var ancho, alto;
+                var screenHeight = document.documentElement.clientHeight;
+                var screenWidth = document.documentElement.clientWidth;
+                var grid = $find("<%=rgConvenios.ClientID %>");
+                 if (grid != null) {
+                var MasterTable = grid.get_masterTableView();
+                var selectedRows = MasterTable.get_selectedItems();
+                var row = selectedRows[0];
+                          var ventana = $find('<%= rwComentario.ClientID %>');
+                          if (selectedRows != "") {
+                              //ancho = parseInt(screenWidth - 300);
+                              ancho = 1200;
+                              alto = parseInt(screenHeight - 20);
+                              var id_reestructura = row.getDataKeyValue("ID_CXC");
+                              ventana.SetUrl("ReporteIncorporacion.aspx?idCXC=" + id_reestructura + "");
+                              ventana.set_title("Reporte de Incorporacion");
+                              ventana.Show();
+                              ventana.SetHeight(alto);
+                              ventana.SetWidth(ancho);
+                              ventana.Center();
+
+                          } else {
+                              alert("Favor de seleccionar una reestructura.");
+                          }
+                      }
+
+            }
+
+           
+
+
+            function disableEnterKey(sender, eventArgs) {
+                tecla = eventArgs.get_keyCode();
+                return (tecla != 13);
+            }
+            function abrirmodal() {
+                document.getElementById('modalbutton').click();
+            }
+
+            function cerrarmodalNuevo() {
+                document.getElementById('cerrarbutton').click();
+
+                var element = document.getElementById("collapseExample2");
+                if (element.classList.contains('show')) {
+                    var bsCollapse = new bootstrap.Collapse(element);
+                    bsCollapse.hide();
+                }
+            }
+        </script>
+    </telerik:RadCodeBlock>
+
+    <telerik:RadAjaxLoadingPanel ID="ralpConvenios" runat="server"></telerik:RadAjaxLoadingPanel>
+    <telerik:RadAjaxManager ID="ramConvenios" runat="server" DefaultLoadingPanelID="ralpConvenios">
+        <AjaxSettings>
+            <telerik:AjaxSetting AjaxControlID="rgConvenios">
+                <UpdatedControls>
+                    <telerik:AjaxUpdatedControl ControlID="rgConvenios" UpdatePanelHeight="100%"/>
+                </UpdatedControls>
+            </telerik:AjaxSetting>
+            <telerik:AjaxSetting AjaxControlID="btnConfirmarFecha">
+                <UpdatedControls>
+                    <telerik:AjaxUpdatedControl ControlID="rgConvenios"/>
+                    <telerik:AjaxUpdatedControl ControlID="rdFechaCaduca"/>
+                    <telerik:AjaxUpdatedControl ControlID="txtNoCXC"/>
+                </UpdatedControls>
+            </telerik:AjaxSetting>
+            <telerik:AjaxSetting AjaxControlID="btnCambioFecha">
+                <UpdatedControls>
+                    <telerik:AjaxUpdatedControl ControlID="rdFechaCaduca"/>
+                    <telerik:AjaxUpdatedControl ControlID="txtNoCXC"/>
+                </UpdatedControls>
+            </telerik:AjaxSetting>
+        </AjaxSettings><%-- DataFormatString="{0:C}" --%>
+    </telerik:RadAjaxManager>
+
+    <h3>Convenios por incorporación o descargas</h3>
+    <div class="ctrlBasico">
+        <asp:Label runat="server" ID="txtInicio" Text="Del"></asp:Label>
+        <telerik:RadDatePicker runat="server" ID="dtInicio"></telerik:RadDatePicker>
+        <asp:Label runat="server" ID="txtFIn" Text="al"></asp:Label>
+        <telerik:RadDatePicker runat="server" ID="dtFin"></telerik:RadDatePicker>
+        <telerik:RadButton runat="server" ID="btnBuscar" Text="Buscar" OnClick="btnBuscar_Click"></telerik:RadButton>
+    </div>
+    <br />
+    <br />
+    <asp:Label ID="lblMensaje" runat="server" EnableViewState="False" Font-Bold="True" />
+    <div style="height: calc(100% - 110px);">    
+        <telerik:RadGrid ID="rgConvenios" runat="server" ShowHeader="true" AutoGenerateColumns="False" GroupPanelPosition="Top" EnableLinqExpressions="false"
+            OnNeedDataSource="rgConvenios_NeedDataSource"
+            Height="100%" Width="100%" PageSize="50">
+            <GroupingSettings CaseSensitive="False" />
+            <ExportSettings FileName="Convenios" ExportOnlyData="true" IgnorePaging="true">
+                    <Excel Format="Xlsx" />
+            </ExportSettings>
+            <ClientSettings AllowKeyboardNavigation="true">
+                <Scrolling AllowScroll="True" UseStaticHeaders="True" ScrollHeight="310" />
+                <Selecting AllowRowSelect="true"></Selecting>
+                <ClientEvents OnRowSelected="ValidarBotones" OnCommand="DesactivarBotones"></ClientEvents>
+            </ClientSettings>
+            <MasterTableView AllowFilteringByColumn="True" AllowPaging="True" AllowSorting="True" AllowNaturalSort="true" DataKeyNames="ID_CXC,CL_ESTADO_CXC,NO_CXC,FE_EXIGIBILIDAD" CommandItemDisplay="Top" ClientDataKeyNames="ID_CXC,CL_ESTADO_CXC,NO_CXC,FE_EXIGIBILIDAD">
+                <CommandItemSettings ShowAddNewRecordButton="False" ShowExportToExcelButton="True" ShowRefreshButton="True"/>
+                <Columns>
+                    <telerik:GridNumericColumn AutoPostBackOnFilter="true"  DataField="ID_CXC" FilterControlWidth="30" HeaderStyle-Width="70" FilterControlAltText="Filter column column" UniqueName="column" Visible="False"></telerik:GridNumericColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NO_CXC" FilterControlWidth="70" HeaderStyle-Width="110" FilterControlAltText="Filter NO_CXC column" HeaderText="No CxC" UniqueName="NO_CXC"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NB_EMPRESA" FilterControlWidth="250" HeaderStyle-Width="290" FilterControlAltText="Filter NB_EMPRESA column" HeaderText="Empresa" UniqueName="NB_EMPRESA"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="CL_RFC" FilterControlWidth="100" HeaderStyle-Width="140" FilterControlAltText="Filter CL_RFC column" HeaderText="RFC" UniqueName="CL_RFC"></telerik:GridBoundColumn>
+                    <telerik:GridDateTimeColumn AutoPostBackOnFilter="true" DataField="FE_CXC" DataFormatString="{0:d}" FilterControlWidth="100" HeaderStyle-Width="140" FilterControlAltText="Filter FE_CXC column" HeaderText="Fecha origen" UniqueName="FE_CXC"></telerik:GridDateTimeColumn>
+                    <telerik:GridDateTimeColumn AutoPostBackOnFilter="true" DataField="FE_EXIGIBILIDAD" DataFormatString="{0:d}" FilterControlWidth="100" HeaderStyle-Width="140" FilterControlAltText="Filter FE_CONVENIO column" HeaderText="Fecha convenio" UniqueName="FE_EXIGIBILIDAD"></telerik:GridDateTimeColumn>
+                    <telerik:GridDateTimeColumn AutoPostBackOnFilter="true" DataField="FE_ULTIMO_PAGO" DataFormatString="{0:d}" FilterControlWidth="100" HeaderStyle-Width="140" FilterControlAltText="Filter FE_ULTIMO_PAGO column" HeaderText="Fecha Último Pago" UniqueName="FE_ULTIMO_PAGO"></telerik:GridDateTimeColumn>
+                    <telerik:GridCalculatedColumn AutoPostBackOnFilter="true" CurrentFilterFunction="EqualTo" DataFields="MN_CXC, MN_CONTRAPRESTACION" Exportable="true" FilterControlWidth="70" HeaderStyle-Width="110" DataType ="System.Decimal" UniqueName ="AccumDeprectn" Aggregate="Sum" Expression ="{0}-{1}" HeaderText="Monto Convenio" ItemStyle-HorizontalAlign="Right" DataFormatString="{0:C2}"> </telerik:GridCalculatedColumn> 
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="DS_ESTADO_CXC" FilterControlWidth="150" HeaderStyle-Width="190" FilterControlAltText="Filter ESTADO_CXC column" HeaderText="Estado" UniqueName="DS_ESTADO_CXC"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="DS_FACTIBILIDAD" FilterControlWidth="150" HeaderStyle-Width="190" FilterControlAltText=" Filter DS_FACTIBILIDAD column" HeaderText="Factibilidad" UniqueName="DS_FACTIBILIDAD"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NO_PAGARE_INICIAL" FilterControlWidth="30" HeaderStyle-Width="70" FilterControlAltText="Filer NO_PAGARE_INICIAL column" HeaderText="Pagar No." UniqueName="NO_PAGARE_INICIAL"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NO_PAGARE_FINAL" FilterControlWidth="30" HeaderStyle-Width="70" FilterControlAltText="Filer NO_PAGARE_FINAL column" HeaderText="No. de pagare" UniqueName="NO_PAGARE_FINAL"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="DS_REFERENCIA_PAGO" FilterControlWidth="150" HeaderStyle-Width="190" FilterControlAltText=" Filter DS_REFERENCIA_PAGO column" HeaderText="Referencia de pago" UniqueName="DS_REFERENCIA_PAGO"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NB_CONTACTO" FilterControlWidth="150" HeaderStyle-Width="190" FilterControlAltText="Filter NB_CONTACTO column" HeaderText="Nombre del contacto" UniqueName="NB_CONTACTO"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NO_TELEFONO" FilterControlWidth="80" HeaderStyle-Width="120" FilterControlAltText="Filter NO_TELEFONO column" HeaderText="Teléfono" UniqueName="NO_TELEFONO"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="NB_MUNICIPIO" FilterControlWidth="80" HeaderStyle-Width="120" FilterControlAltText="Filter NB_MUNICIPIO column" HeaderText="Municipio" UniqueName="NB_MUNICIPIO"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="DS_CXC" FilterControlWidth="280" HeaderStyle-Width="320" FilterControlAltText="Filter DS_CXC column" HeaderText="Descripción" UniqueName="DS_CXC"></telerik:GridBoundColumn>
+                    <telerik:GridBoundColumn AutoPostBackOnFilter="true" CurrentFilterFunction="Contains" DataField="DS_OBSERVACIONES" FilterControlWidth="280" HeaderStyle-Width="320" FilterControlAltText="Filter DS_OBSERVACIONES column" HeaderText="Observaciones" UniqueName="DS_OBSERVACIONES"></telerik:GridBoundColumn>
+                </Columns>
+                <PagerStyle AlwaysVisible="True" />
+            </MasterTableView>
+        </telerik:RadGrid>
+    </div>
+    <br />
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnNuevo" runat="server" Text="Nuevo" Width="100px" OnClick="btnNuevo_Click"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnEditar" runat="server" Text="Editar" Width="100px" OnClick="btnEditar_Click"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnConsultar" runat="server" Text="Consultar" Width="100px" OnClick="btnConsultar_Click"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnEliminar" runat="server" Text="Eliminar" OnClientClicking="StandardConfirm" Width="100px" OnClick="btnEliminar_Click"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnComentariosPagos" runat="server" Text="Comentarios a pagos" OnClientClicking="AbrirPagos" AutoPostBack="false"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnReporte" runat="server" Text="Reportes" AutoPostBack="false" OnClientClicked="AbrirReportePopUp"></telerik:RadButton>
+    </div>
+    <div class="ctrlBasico">
+        <telerik:RadButton ID="btnCambioFecha" Enabled="false" runat="server" Text="Cambiar exigibilidad" OnClick="btnCambioFecha_Click" AutoPostBack="true"></telerik:RadButton>
+    </div>
+    <button type="button" class="btn" id="modalbutton" data-bs-toggle="modal" style="display:none" data-bs-target="#ModalFecha"></button>
+    <div class="modal fade" id="ModalFecha" tabindex="-2" aria-labelledby="ModalFechaLabel" data-bs-backdrop="static" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm"  id="moodal" runat="server">
+        <div class="modal-content">
+          <div class="modal-header text-bg-dark" id="head_modal" style="background-color:  #012F50 !important ;">
+            <h1 class="modal-title fs-5" id="ModalFechaLabel">Actualizar CXC</h1>
+              <button type="button" id="cerrarbutton" style="display:none" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row">
+                <div class="col-12">
+                    <label for="txtNoCXC" class="form-label" style="font-size:1rem;">No. CXC:</label>
+                    <telerik:RadTextBox runat="server" ID="txtNoCXC" ReadOnly="true" Skin="Bootstrap" Font-Size="Larger" Width="250"></telerik:RadTextBox>
+                </div>
+            </div>
+              <br />
+            <div>
+                <label for="rdFechaCaduca" class="form-label" style="font-size:1rem;">Fecha exigibilidad:</label>
+                <telerik:RadDatePicker runat="server" ID="rdFechaCaduca" Font-Size="Larger" Skin="Bootstrap" AutoPostBack="false" Width="250"> 
+                    <DateInput runat="server" Font-Size="Larger"> 
+                        <ClientEvents OnKeyPress="disableEnterKey" /> 
+                    </DateInput>
+                </telerik:RadDatePicker>
+                <br />
+            </div>
+          </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">Cancelar</button>
+            <a class="btn btn-outline-info" data-bs-toggle="collapse" id="btnActualizaFecha" href="#collapseExample2" role="button" aria-expanded="false" aria-controls="collapseExample2">Guardar</a>
+            <br />
+            <div class="collapse" id="collapseExample2">
+                <div class="card card-body">
+                    <label class="form-label fs-6">¿Esta seguro de cambiar la fecha de exigibilidad?</label>
+                    <br />
+                    <div class="row">
+                    <div class="col-md-1"></div>
+                    <div class="col-md-4"><asp:LinkButton ID="btnConfirmarFecha" CssClass="btn btn-outline-info" OnClick="btnConfirmarFecha_Click" runat="server">Confirmar</asp:LinkButton></div>
+                    <div class="col-md-1"></div>
+                    <div class="col-md-4"><a class="btn btn-outline-dark" data-bs-toggle="collapse" ID="btnCancelarFecha" href="#collapseExample2" role="button" aria-expanded="false" aria-controls="collapseExample2">Cancelar</a></div>
+                    <div class="col-md-2"></div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+      </div>
+    </div>
+    
+    <script type="text/javascript">
+        var element = document.getElementById("collapseExample2");
+        document.getElementById("ModalFecha").addEventListener('hide.bs.modal', event => {
+            if (element.classList.contains('show')) {
+                var bsCollapse = new bootstrap.Collapse(element);
+                bsCollapse.hide();
+            }
+        });
+    </script>
+
+     <telerik:RadWindowManager ID="RadWindowManager1" runat="server" ShowContentDuringLoad="false" VisibleStatusbar="false" ReloadOnShow="true" EnableShadow="true" OnClientClose="OnCloseWindow">
+        <Windows>
+            <telerik:RadWindow ID="rwComentario" runat="server" ReloadOnShow="true" Modal="true" VisibleStatusbar="false" VisibleTitlebar="true" Behaviors="Close" OnClientClose="returnDataToParentPopup"></telerik:RadWindow>
+            <telerik:RadWindow ID="rwPagos" runat="server" ReloadOnShow="true" Modal="true" VisibleStatusbar="false" VisibleTitlebar="true" Behaviors="Close" OnClientClose="OnCloseWindow"></telerik:RadWindow>
+        </Windows>
+    </telerik:RadWindowManager>
+</asp:Content>
